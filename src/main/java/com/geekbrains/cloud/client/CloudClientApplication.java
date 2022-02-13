@@ -14,6 +14,9 @@ public class CloudClientApplication extends Application {
                 getClass().getResource("layout.fxml")
         );
         primaryStage.setScene(new Scene(parent));
+        primaryStage.setOnCloseRequest(event -> {
+            MainController.exitButtonAction();
+        });
         primaryStage.show();
     }
 }

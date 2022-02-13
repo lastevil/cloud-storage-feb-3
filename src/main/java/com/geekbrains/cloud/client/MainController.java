@@ -1,12 +1,7 @@
 package com.geekbrains.cloud.client;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.Socket;
 import java.net.URL;
 import java.util.ResourceBundle;
 
@@ -18,7 +13,7 @@ import javafx.scene.control.TextField;
 
 public class MainController implements Initializable {
 
-    private static final int BUFFER_SIZE = 8192;
+
 
     public TextField clientPath;
     public TextField serverPath;
@@ -26,23 +21,45 @@ public class MainController implements Initializable {
     public ListView<String> serverView;
     private File currentDirectory;
 
-    private DataInputStream is;
-    private DataOutputStream os;
-    private byte[] buf;
+    private static ClientConnector client;
 
     // Platform.runLater(() -> {})
+
     private void updateClientView() {
         Platform.runLater(() -> {
+            if (currentDirectory != null){
             clientPath.setText(currentDirectory.getAbsolutePath());
             clientView.getItems().clear();
             clientView.getItems().add("...");
-            clientView.getItems()
-                    .addAll(currentDirectory.list());
+            if (currentDirectory.list()!=null) {
+                clientView.getItems()
+                        .addAll(currentDirectory.list());
+            }
+        }
         });
     }
 
-    public void download(ActionEvent actionEvent) {
+    public void updateServerView (String[] s){
+        Platform.runLater(() -> {
+            String sb = "";
+            String command = null;
+                serverPath.setText(s[0]);
+                serverView.getItems().clear();
+                serverView.getItems().add("...");
+                for (int i = 1; i<s.length;i++){
+                    serverView.getItems()
+                            .add(s[i]);
+                }
+        });
 
+    }
+
+    public void download(ActionEvent actionEvent) {
+        String item = serverView.getSelectionModel().getSelectedItem();
+        if (item.contains(".")) {
+            client.getSelectedFile(item,currentDirectory);
+        }
+        updateClientView();
     }
 
     // upload file to server
@@ -50,39 +67,21 @@ public class MainController implements Initializable {
         String item = clientView.getSelectionModel().getSelectedItem();
         File selected = currentDirectory.toPath().resolve(item).toFile();
         if (selected.isFile()) {
-            os.writeUTF("#file_message#");
-            os.writeUTF(selected.getName());
-            os.writeLong(selected.length());
-            try (InputStream fis = new FileInputStream(selected)) {
-                while (fis.available() > 0) {
-                    int readBytes = fis.read(buf);
-                    os.write(buf, 0, readBytes);
-                }
-            }
-            os.flush();
+            client.sendSelectedFile(selected);
         }
     }
 
-    private void initNetwork() {
-        try {
-            buf = new byte[BUFFER_SIZE];
-            Socket socket = new Socket("localhost", 8189);
-            is = new DataInputStream(socket.getInputStream());
-            os = new DataOutputStream(socket.getOutputStream());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public static void exitButtonAction() {
+        client.sendClose();
     }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         currentDirectory = new File(System.getProperty("user.home"));
-
-
+        this.client = new ClientConnector(this);
         // run in FX Thread
         // :: - method reference
         updateClientView();
-        initNetwork();
         clientView.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 String item = clientView.getSelectionModel().getSelectedItem();
